@@ -151,6 +151,35 @@ class HamLayerBackward(HamLayer):
         return x
 
 
+class DepthToSpace(Layer):
+    def call(self, inputs, **kwargs):
+        return tf.depth_to_space(inputs, 2)
+
+    def compute_output_shape(self, input_shape):
+        return input_shape[0], input_shape[1] * 2, input_shape[2] * 2, input_shape[3] / 4
+
+    def get_backward(self):
+        return SpaceToDepth()
+
+class SpaceToDepth(Layer):
+    def call(self, inputs, **kwargs):
+        return tf.space_to_depth(inputs, 2)
+
+    def get_backward(self):
+        return DepthToSpace()
+
+    def compute_output_shape(self, input_shape):
+        return input_shape[0], input_shape[1] / 2, input_shape[2] / 2, input_shape[3] * 4
+
+
+class Upsample(UpSampling2D):
+    def get_backward(self):
+        return AvgPool2D(pool_size=self.size, data_format=self.data_format)
+
+class Downsample(AvgPool2D):
+    def get_backward(self):
+        return UpSampling2D(size=self.pool_size, data_format=self.data_format)
+
 class InvTanh(Layer):
     def call(self, inputs, **kwargs):
         return 0.5 * (K.log(1 + inputs + 1e-6) - K.log(1 - inputs + 1e-6))
@@ -167,16 +196,17 @@ def upsize_downdim_block(input, upsize=(2, 2), dim_downsize = 2):
     return out
 
 def main():
-    inp = Input((3, 3, 2))
-    ham = HamLayer()
-    bcw = ham.get_backward()
+    inp = Input((3, 3, 4))
+    ham = DepthToSpace()
+    bcw = SpaceToDepth()
 
     mid = ham(inp)
     out = bcw(mid)
 
     m = Model(inp, out)
     m.summary()
-    print (m.predict(np.arange(18).reshape(1, 3, 3, 2)))
+    print (np.arange(2 * 18).reshape(1, 3, 3, 4))
+    print (m.predict(np.arange(2 * 18).reshape(1, 3, 3, 4)))
 
 if __name__ == "__main__":
     main()
