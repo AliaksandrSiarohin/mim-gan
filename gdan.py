@@ -9,15 +9,16 @@ class GDAN(GAN):
         self.gradient_penalty_weight_generator = gradient_penalty_weight_generator
 
         super(GDAN, self).__init__(**kwargs)
-        inp = self.generator_input[0]
-        inp = Input(name='inp', tensor=inp)
-        self.grad_generator = clone_model(self.generator, input_tensors=inp)
-        #self.grad_generator self.generator_input
-        self.grad_generator_output = self.grad_generator(self.generator_input)
+        # inp = self.generator_input[0]
+        # inp = Input(name='inp', tensor=inp)
+        # self.grad_generator = clone_model(self.generator, input_tensors=inp)
+        # #self.grad_generator self.generator_input
+        # self.grad_generator_output = self.grad_generator(self.generator_input)
 
     def compile_intermediate_variables(self):
-        self.generator_output = self.generator(self.generator_input)
-        #self.grad_generator_output = generator_output[1]
+        generator_output =  self.generator(self.generator_input)
+        self.generator_output = generator_output[0]
+        self.grad_generator_output = generator_output[1]
         self.discriminator_fake_output = self.discriminator(self.generator_output)
         self.discriminator_real_output = self.discriminator(self.discriminator_input)
 
@@ -56,27 +57,27 @@ class GDAN(GAN):
                 self.discriminator_metric_names.append('gp_loss_' + str(i))
         return gp_list
 
-    def compile_generator_train_op(self):
-        loss_list = []
-        adversarial_loss = self.get_generator_adversarial_loss(self.generator_adversarial_objective)
-        loss_list.append(adversarial_loss)
-
-        loss_list += self.additional_generator_losses()
-        self.generator_loss_list = loss_list
-
-        updates = self.generator_optimizer.get_updates(params=self.generator.trainable_weights + self.grad_generator.trainable_weights,
-                                                       loss=sum(loss_list))
-        updates += self.collect_updates(self.generator)
-        updates += self.collect_updates(self.grad_generator)
-        print (self.collect_updates(self.generator))
-
-        lr_update = (self.lr_decay_schedule_generator(self.generator_optimizer.iterations) *
-                                K.get_value(self.generator_optimizer.lr))
-        updates.append(K.update(self.generator_optimizer.lr, lr_update))
-
-        train_op = K.function(self.generator_input + self.additional_inputs_for_generator_train + [K.learning_phase()],
-                            [sum(loss_list)] + loss_list, updates=updates)
-        return train_op
+    # def compile_generator_train_op(self):
+    #     loss_list = []
+    #     adversarial_loss = self.get_generator_adversarial_loss(self.generator_adversarial_objective)
+    #     loss_list.append(adversarial_loss)
+    #
+    #     loss_list += self.additional_generator_losses()
+    #     self.generator_loss_list = loss_list
+    #
+    #     updates = self.generator_optimizer.get_updates(params=self.generator.trainable_weights + self.grad_generator.trainable_weights,
+    #                                                    loss=sum(loss_list))
+    #     updates += self.collect_updates(self.generator)
+    #     updates += self.collect_updates(self.grad_generator)
+    #     print (self.collect_updates(self.generator))
+    #
+    #     lr_update = (self.lr_decay_schedule_generator(self.generator_optimizer.iterations) *
+    #                             K.get_value(self.generator_optimizer.lr))
+    #     updates.append(K.update(self.generator_optimizer.lr, lr_update))
+    #
+    #     train_op = K.function(self.generator_input + self.additional_inputs_for_generator_train + [K.learning_phase()],
+    #                         [sum(loss_list)] + loss_list, updates=updates)
+    #     return train_op
 
 
     def additional_generator_losses(self):
@@ -86,4 +87,4 @@ class GDAN(GAN):
 
     def compile_generate_op(self):
         return K.function(self.generator_input + self.additional_inputs_for_generator_train + [K.learning_phase()],
-                        self.generator_output + [self.grad_generator_output])
+                          self.generator_output + [self.grad_generator_output])

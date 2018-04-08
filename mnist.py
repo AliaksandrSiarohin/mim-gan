@@ -12,8 +12,12 @@ import keras.backend as K
 from gdan import GDAN
 from gan.gan import GAN
 import numpy as np
+from scorer import compute_scores
+from functools import partial
 
-def make_generator_branch(z, name='generator'):
+def make_generator():
+
+    z = Input((128, ))
     out = Dense(1024)(z)
     out = LeakyReLU()(out)
     out = Dense(128 * 7 * 7)(out)
@@ -27,14 +31,10 @@ def make_generator_branch(z, name='generator'):
     out = LeakyReLU()(out)
     out = Conv2DTranspose(64, (5, 5), strides=2, padding='same')(out)
     out = BatchNormalization()(out)
-    out = Convolution2D(1, (5, 5), padding='same', activation='tanh')(out)
-    return out
+    out_gen = Convolution2D(1, (5, 5), padding='same', activation='tanh')(out)
+    out_grad = Convolution2D(1, (5, 5), padding='same', activation='tanh')(out)
 
-def make_generator():
-
-    z = Input((128, ))
-    out1 = make_generator_branch(z, name='generator')
-    return Model(z, out1)
+    return Model(z, [out_gen, out_grad])
 
 
 def make_discriminator():
@@ -72,10 +72,8 @@ class MNISTDataset(ArrayDataset):
             return image
 
         image = batch_as_image(batch)
-        return image
-        #img_gd = batch_as_image(output_batch[1])
-        #return np.concatenate([image, img_gd], axis=1)
-
+        img_gd = batch_as_image(output_batch[1])
+        return np.concatenate([image, img_gd], axis=1)
 
 def main():
     generator = make_generator()
@@ -86,7 +84,10 @@ def main():
     args = parser_with_default_args().parse_args()
     dataset = MNISTDataset(args.batch_size)
     gan = GDAN(generator=generator, discriminator=discriminator, **vars(args))
-    trainer = Trainer(dataset, gan, **vars(args))
+
+    hook = partial(compute_scores, generator=generator, dataset=dataset, image_shape=(28, 28, 1),
+                   compute_inception=False)
+    trainer = Trainer(dataset, gan, at_store_checkpoint_hook=hook, **vars(args))
     trainer.train()
 
 if __name__ == "__main__":
