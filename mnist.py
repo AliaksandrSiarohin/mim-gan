@@ -1,10 +1,9 @@
 from keras.models import Sequential, Model, Input, clone_model
-from keras.layers import Dense, Reshape, Flatten, Activation, Add, Lambda
+from keras.layers import Dense, Reshape, Flatten, Activation, Add, Lambda, BatchNormalization
 from keras.layers.convolutional import Convolution2D, AveragePooling2D, UpSampling2D, Conv2DTranspose
-from keras.layers.normalization import BatchNormalization
 from keras.layers.advanced_activations import LeakyReLU
 
-from blocks import HamLayer
+from blocks import HamLayer, SpaceToDepth, DepthToSpace, Upsample, Downsample
 
 from gan.dataset import ArrayDataset
 from gan.cmd import parser_with_default_args
@@ -35,9 +34,6 @@ def make_generator():
 
     z = Input((128, ))
     out1 = make_generator_branch(z, name='generator')
-    # out2 = make_generator_branch(z, name='grad_generator')
-    # print K.int_shape(out1)
-    # print K.int_shape(out2)
     return Model(z, out1)
 
 
@@ -81,11 +77,9 @@ class MNISTDataset(ArrayDataset):
         #return np.concatenate([image, img_gd], axis=1)
 
 
-
 def main():
     generator = make_generator()
     discriminator = make_discriminator()
-
     generator.summary()
     discriminator.summary()
 
